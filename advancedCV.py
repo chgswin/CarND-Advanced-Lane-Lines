@@ -207,14 +207,6 @@ def scan_lane_pixels(warped_img, nwindows = 10, margin = 50, minpix = 100):
         
         left_window.append(((win_xleft_low, win_y_low), (win_xleft_high, win_y_high)))
         right_window.append(((win_xright_low, win_y_low),(win_xright_high, win_y_high)))
-        
-        #Draw the windows on the visualization image
-#         cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high),  
-#                     (255,0,0), 5)
-#         cv2.rectangle(out_img, 
-#                      (win_xright_low, win_y_low),
-#                     (win_xright_high, win_y_high), 
-#                     (255,0,0), 5)
 
         #Identify the nonzero pixels in x and y within the window #
         good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 

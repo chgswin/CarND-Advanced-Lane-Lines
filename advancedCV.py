@@ -125,8 +125,8 @@ def threshold_image(img):
     sat_thres = (100, 255)
 
     color_criteria = ((RGB_red >= red_thres[0]) & (RGB_red <= red_thres[1])) \
-                    & ((HLS_sat >= sat_thres[0]) & (HLS_sat <= sat_thres[1])) \
-                    & ((HSV_val >= val_thres[0]) & (HSV_val <= val_thres[1])) 
+                    & ((HLS_sat >= sat_thres[0]) & (HLS_sat <= sat_thres[1])) #
+                    # ((HSV_val >= val_thres[0]) & (HSV_val <= val_thres[1])) 
 
 
     combined_color[color_criteria] = 1
@@ -191,6 +191,9 @@ def scan_lane_pixels(warped_img, nwindows = 10, margin = 50, minpix = 100):
     left_lane_inds = []
     right_lane_inds = []
     
+    left_window = []
+    right_window = []
+    
     for window in range(nwindows):
         #Identify window boundaries in x and y (and right and left)
         win_y_low = warped_img.shape[0] - (window+1) * window_height
@@ -202,21 +205,23 @@ def scan_lane_pixels(warped_img, nwindows = 10, margin = 50, minpix = 100):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
         
+        left_window.append(((win_xleft_low, win_y_low), (win_xleft_high, win_y_high)))
+        right_window.append(((win_xright_low, win_y_low),(win_xright_high, win_y_high)))
         
         #Draw the windows on the visualization image
-        cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high),  
-                    (255,0,0), 5)
-        cv2.rectangle(out_img, 
-                     (win_xright_low, win_y_low),
-                    (win_xright_high, win_y_high), 
-                    (255,0,0), 5)
+#         cv2.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high),  
+#                     (255,0,0), 5)
+#         cv2.rectangle(out_img, 
+#                      (win_xright_low, win_y_low),
+#                     (win_xright_high, win_y_high), 
+#                     (255,0,0), 5)
 
         #Identify the nonzero pixels in x and y within the window #
         good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
-        (nonzerox >= win_xleft_low) &  (nonzerox < win_xleft_high)).nonzero()[0]
+        (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
         
         good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
-        (nonzerox >= win_xright_low) &  (nonzerox < win_xright_high)).nonzero()[0]
+        (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
         
         #Append these indices to the lists
         left_lane_inds.append(good_left_inds)
@@ -247,7 +252,7 @@ def scan_lane_pixels(warped_img, nwindows = 10, margin = 50, minpix = 100):
     out_img[lefty, leftx] = [0,255,0]
     out_img[righty, rightx] = [0,0,255]
     
-    return leftx, lefty, rightx, righty, out_img
+    return leftx, lefty, rightx, righty, out_img, left_window, right_window
 
 def search_around_poly(warped_img, last_left_fit_coeff, last_right_fit_coeff, nwindows = 9, margin = 100, minpix = 100):
     
@@ -272,32 +277,32 @@ def search_around_poly(warped_img, last_left_fit_coeff, last_right_fit_coeff, nw
     
     return leftx, lefty, rightx, righty, out_img
 
-def fit_polynomial(img_shape, leftx, lefty, rightx, righty):
-    height = img_shape[0]
-    ploty = np.linspace(0, height-1, height)
-    
+def fit_polynomial(leftx, lefty, rightx, righty, useWeight=True):
     
     try:
-        left_fit_coeffs = np.polyfit(lefty, leftx, 2)
-        right_fit_coeffs = np.polyfit(righty, rightx, 2)
-    
+        if useWeight:
+            weight = lefty**2
+        else:
+            weight = None
+            
+        left_fit_coeffs = np.polyfit(lefty, leftx, deg = 2, w=weight)
     except Exception as e:
-        print(e)
-        return None, None, None, None, ploty
-    
- 
-    
-    try:
-        left_fitx = np.polyval(left_fit_coeffs, ploty)
-        right_fitx = np.polyval(right_fit_coeffs, ploty)
+        print("Left lane: ", e)
+        left_fit_coeffs = None
         
-    except TypeError:
-        #Avoid an error if 'left' or 'right_fit_coeffs' are still none or incorrect
-        print('The function failed to fit a line!')
-        left_fitx = None #np.polyval([1,1,0], ploty)
-        right_fitx = None #np.polyval([1,1,0], ploty)
-
-    return left_fit_coeffs, right_fit_coeffs, left_fitx, right_fitx, ploty
+    try:
+        if useWeight:
+            weight = righty**2
+        else:
+            weight = None
+            
+        right_fit_coeffs = np.polyfit(righty, rightx, deg = 2, w=weight)
+        
+    except Exception as e:
+        print("Right lane: ", e)
+        right_fit_coeffs = None
+    
+    return left_fit_coeffs, right_fit_coeffs
 
 def draw_detected_lane_lines(warped_img, leftx, lefty, rightx, righty, left_fitx, right_fitx, ploty, margin = 100):
     
@@ -310,6 +315,14 @@ def draw_detected_lane_lines(warped_img, leftx, lefty, rightx, righty, left_fitx
     
     #Generate a polygon to illustrate the search window area
     #and recast the xand y points into usable format for cv2.fillPoly()
+    left_line = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    
+    right_line = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    
+    mid_line = np.array([np.transpose(np.vstack([(left_fitx + right_fitx) / 2, ploty]))])
+    cv2.polylines(window_img, np.int_([left_line]), isClosed = False, color = (255, 0, 0), thickness = 10)
+    cv2.polylines(window_img, np.int_([right_line]), isClosed = False, color = (255, 0, 0), thickness = 10)
+    cv2.polylines(window_img, np.int_([mid_line]), isClosed = False, color = (255,0,0), thickness = 15)
     
     left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
     left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
@@ -317,12 +330,12 @@ def draw_detected_lane_lines(warped_img, leftx, lefty, rightx, righty, left_fitx
     
     right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
     right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
-    #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack[right_fitx + margin, ploty]))])
+
     right_line_pts = np.hstack((right_line_window1, right_line_window2))
     
     #Draw the lane onto the warped blank image
-    cv2.fillPoly(window_img, np.int_([left_line_pts]), (255,0,150))
-    cv2.fillPoly(window_img, np.int_([right_line_pts]), (255,0,150))
+    cv2.fillPoly(window_img, np.int_([left_line_pts]), (255,0,255))
+    cv2.fillPoly(window_img, np.int_([right_line_pts]), (255,0,255))
 
     result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     
@@ -333,7 +346,9 @@ def draw_detected_lane_lines(warped_img, leftx, lefty, rightx, righty, left_fitx
     
     return result
 
-def fill_lane(warped_img, leftx, lefty, rightx, righty, left_fitx, right_fitx, ploty):
+def fill_lane(warped_img, leftx, lefty, rightx, righty, 
+              left_fitx, right_fitx, ploty, 
+              left_window, right_window, searchAroundPoly = True):
     
     out_img = np.uint8(np.dstack((warped_img, warped_img, warped_img)))
     
@@ -348,16 +363,27 @@ def fill_lane(warped_img, leftx, lefty, rightx, righty, left_fitx, right_fitx, p
     left_line = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     
     right_line = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    
+    mid_line = np.array([np.transpose(np.vstack([(left_fitx + right_fitx) / 2, ploty]))])
+    
     #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack[right_fitx + margin, ploty]))])
     
     lane = np.hstack((left_line, right_line))
     
                   
     #Draw the lane onto the warped blank image
+
+    cv2.fillPoly(window_img, np.int_([lane]), (0,255,0) if searchAroundPoly else (255,255,0))
+    
     cv2.polylines(window_img, np.int_([left_line]), isClosed = False, color = (255, 0, 0), thickness = 10)
     cv2.polylines(window_img, np.int_([right_line]), isClosed = False, color = (255, 0, 0), thickness = 10)
-    cv2.fillPoly(window_img, np.int_([lane]), (0,255,0))
+    cv2.polylines(window_img, np.int_([mid_line]), isClosed = False, color = (255,0,0), thickness = 15)
     
+    for low, high in left_window:
+        cv2.rectangle(window_img, (low[0], low[1]), (high[0], high[1]), (255,0,0), 5)
+    
+    for low, high in right_window:
+        cv2.rectangle(window_img, (low[0], low[1]), (high[0], high[1]), (255,0,0), 5)
     
     # Plot the polynomial lines onto the image
     # plt.plot(left_fitx, ploty, color='yellow')

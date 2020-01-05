@@ -240,3 +240,8 @@ __Problem:__ The actual lane lines change dramatically and the regression lines 
 __Proposed Solution__:
 
 * Widen the area of interest horizontally but shorten it vertically. These might help detecting the nearest lane lines more reliable.
+
+### Reference
+
+1. <a href=https://github.com/jeremy-shannon/CarND-Advanced-Lane-Lines>Jeremy Shannon's project</a>
+2. <a href=https://github.com/tranlyvu/Self-Driving-Car-Engineer-Part-1/tree/master/Advanced%20Lane%20Lines>Tran Ly Vu's project</a>

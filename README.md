@@ -57,6 +57,8 @@ The goals of this project are the following:
 
 You're reading it!
 
+*Note*: All the helper functions are provided in <a href=https://github.com/chgswin/CarND-Advanced-Lane-Lines/blob/master/advancedCV.py>`advancedCV.py`</a>
+
 ### Camera Calibration
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
@@ -185,6 +187,10 @@ With all the points within the sliding windows, the possible lane line is constr
 ##### 4.2. Finding the active pixels around the previous curve with `search_around_poly()`
 For stable lanes, it is usual for lane lines to be near around previous lane lines. Keeping this in mind, a faster method to scan active pixels only around previous lane lines is constructed. All active pixels within a horizontal offset from previous lines are detected for a new curve to be fitted. This method could effectively speed up the whole process and help reduce possible noise from around the lanes. 
 
+##### 4.3. Further improvement
+
+It is observed that the existing `fit_polynomial` might be prone to errors as it could mistakenly detect other noise lines. To reduce this, an array of weights is used: pixel points near the car (at the bottom of the images) carry more weight than the points far away from the cars. This improvement helps the most when there could be other lines that lie next to the actual lane lines.
+
 ![search around previous line][search_around_poly]
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
@@ -205,12 +211,32 @@ The best fit polynomial provides three coefficients: Ax^2 + Bx + C. The referenc
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+[link to my video result](output_videos/project_video.mp4)
 
+[link to my challenge result](output_videos/challenge_video.mp4)
 ---
 
 ### Discussion
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+__Problem:__ The polynomial is fitted but too different from the last frame or it might not be as reasonable to be accepted.
+
+__Proposed Solution:__:
+* *Impose a different limit serving as sanity check:* New polynomial is compared against the previous polynomial and the value is only trusted if the coeffients are not too different from the previous one.
+
+* *Implement a average FIR filter:* To ensure that the lane detection is stable, the best fit is the average of the newest found one and four previous polynomials.
+
+* *:*
+
+__Problem:__ Data is not enough to trust the polynomial being fitted
+
+__Proposed Solution:__:
+
+In this case, we might need to delay fitting the new polynomial, using the recent reliable fit and waiting until number of active pixels are adequate to fit a trustful curve.
+
+__Problem:__ The actual lane lines change dramatically and the regression lines do not fit well.
+
+__Proposed Solution__:
+
+* Widen the area of interest horizontally but shorten it vertically. These might help detecting the nearest lane lines more reliable.

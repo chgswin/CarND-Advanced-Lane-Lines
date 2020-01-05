@@ -57,6 +57,8 @@ The goals of this project are the following:
 
 You're reading it!
 
+*Note*: All the helper functions are provided in <a href=https://github.com/chgswin/CarND-Advanced-Lane-Lines/blob/master/advancedCV.py>`advancedCV.py`</a>
+
 ### Camera Calibration
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
